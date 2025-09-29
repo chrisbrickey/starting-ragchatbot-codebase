@@ -34,6 +34,27 @@ app.add_middleware(
 # Initialize RAG system
 rag_system = RAGSystem(config)
 
+# Validate critical configuration on startup
+if not config.ANTHROPIC_API_KEY or config.ANTHROPIC_API_KEY == "":
+    print("\n" + "="*70)
+    print("⚠️  WARNING: ANTHROPIC_API_KEY is not configured!")
+    print("="*70)
+    print("The application will not work without a valid API key.")
+    print("\nTo fix this:")
+    print("1. Create a .env file in the project root (if it doesn't exist)")
+    print("2. Add your Anthropic API key:")
+    print("   ANTHROPIC_API_KEY=sk-ant-your-key-here")
+    print("3. Get your API key from: https://console.anthropic.com/")
+    print("4. Restart this application")
+    print("="*70 + "\n")
+elif config.ANTHROPIC_API_KEY == "your-anthropic-api-key-here":
+    print("\n" + "="*70)
+    print("⚠️  WARNING: Using placeholder API key!")
+    print("="*70)
+    print("Please edit your .env file and replace the placeholder with your")
+    print("actual Anthropic API key from: https://console.anthropic.com/")
+    print("="*70 + "\n")
+
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     """Request model for course queries"""
