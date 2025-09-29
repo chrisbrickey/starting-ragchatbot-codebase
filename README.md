@@ -1,10 +1,10 @@
 # Course Materials RAG System
 
-A Retrieval-Augmented Generation (RAG) system designed to answer questions about course materials using semantic search and AI-powered responses.
+This is a Retrieval-Augmented Generation (RAG) system for querying course materials using semantic search and AI-powered responses. 
+The application uses ChromaDB for vector storage, Anthropic's Claude for AI generation, and provides a web interface for interaction.
 
-## Overview
-
-This application is a full-stack web application that enables users to query course materials and receive intelligent, context-aware responses. It uses ChromaDB for vector storage, Anthropic's Claude for AI generation, and provides a web interface for interaction.
+**Note:** This repository is forked from [https-deeplearning-ai/starting-ragchatbot-codebase](https://github.com/https-deeplearning-ai/starting-ragchatbot-codebase).
+I'm using this repository as a sandbox for experimenting with Claude Code.
 
 
 ## Prerequisites
@@ -27,11 +27,25 @@ This application is a full-stack web application that enables users to query cou
    ```
 
 3. **Set up environment variables**
-   
-   Create a `.env` file in the root directory:
+
+   Create a `.env` file with your Anthropic API key:
    ```bash
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   # Copy the template file
+   cp .env.example .env
+
+   # Edit .env and add your API key
+   # Get your key from: https://console.anthropic.com/
    ```
+
+   Your `.env` file should look like:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
+   ```
+
+   **Important:**
+   - The `.env` file is gitignored and will NOT be committed
+   - Never commit your API key to version control
+   - If you see "query failed" errors, check that your API key is set correctly
 
 ## Running the Application
 
@@ -54,3 +68,38 @@ The application will be available at:
 - Web Interface: `http://localhost:8000`
 - API Documentation: `http://localhost:8000/docs`
 
+## Troubleshooting
+
+### "Query failed" Error
+
+If you see "query failed" when asking questions:
+
+1. **Check your API key is set**
+   ```bash
+   # In project root, verify .env file exists
+   ls -la .env
+
+   # Check if key is configured (won't show the actual key)
+   grep ANTHROPIC_API_KEY .env
+   ```
+
+2. **Verify the key format**
+   - Should start with `sk-ant-`
+   - No quotes around the value
+   - No spaces before or after the `=`
+
+3. **Restart the application**
+   - Stop the server (Ctrl+C)
+   - Start it again - you should see a warning if the key is missing
+
+4. **Check startup logs**
+   - Look for warnings about API key configuration
+   - The application will display clear messages if the key is missing or invalid
+
+### Testing the System
+
+Run the comprehensive test suite:
+```bash
+cd backend
+uv run pytest tests/ -v
+```
