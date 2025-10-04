@@ -241,7 +241,7 @@ def mock_anthropic_client():
 
 @pytest.fixture
 def mock_anthropic_client_with_tool_use():
-    """Create a mock Anthropic client that triggers tool use"""
+    """Create a mock Anthropic client that triggers tool use (single round)"""
     mock_client = Mock()
 
     # First response - tool use
@@ -266,6 +266,90 @@ def mock_anthropic_client_with_tool_use():
 
     # Setup the mock to return different responses on sequential calls
     mock_client.messages.create.side_effect = [first_response, second_response]
+
+    return mock_client
+
+
+@pytest.fixture
+def mock_anthropic_client_sequential_tool_use():
+    """Create a mock Anthropic client that uses tools in 2 sequential rounds"""
+    mock_client = Mock()
+
+    # Round 1 - first tool use
+    round1_tool = Mock()
+    round1_tool.type = "tool_use"
+    round1_tool.id = "toolu_round1"
+    round1_tool.name = "search_course_content"
+    round1_tool.input = {"query": "course outline"}
+
+    round1_response = Mock()
+    round1_response.content = [round1_tool]
+    round1_response.stop_reason = "tool_use"
+
+    # Round 2 - second tool use
+    round2_tool = Mock()
+    round2_tool.type = "tool_use"
+    round2_tool.id = "toolu_round2"
+    round2_tool.name = "search_course_content"
+    round2_tool.input = {"query": "lesson 4 details"}
+
+    round2_response = Mock()
+    round2_response.content = [round2_tool]
+    round2_response.stop_reason = "tool_use"
+
+    # Final response - text answer
+    final_text = Mock()
+    final_text.type = "text"
+    final_text.text = "Based on both searches, here is the complete answer."
+
+    final_response = Mock()
+    final_response.content = [final_text]
+    final_response.stop_reason = "end_turn"
+
+    # Setup the mock to return different responses on sequential calls
+    mock_client.messages.create.side_effect = [round1_response, round2_response, final_response]
+
+    return mock_client
+
+
+@pytest.fixture
+def mock_anthropic_client_max_rounds_exhaustion():
+    """Create a mock Anthropic client that exhausts MAX_TOOL_ROUNDS"""
+    mock_client = Mock()
+
+    # Round 1 - tool use
+    round1_tool = Mock()
+    round1_tool.type = "tool_use"
+    round1_tool.id = "toolu_1"
+    round1_tool.name = "search_course_content"
+    round1_tool.input = {"query": "first search"}
+
+    round1_response = Mock()
+    round1_response.content = [round1_tool]
+    round1_response.stop_reason = "tool_use"
+
+    # Round 2 - tool use again
+    round2_tool = Mock()
+    round2_tool.type = "tool_use"
+    round2_tool.id = "toolu_2"
+    round2_tool.name = "search_course_content"
+    round2_tool.input = {"query": "second search"}
+
+    round2_response = Mock()
+    round2_response.content = [round2_tool]
+    round2_response.stop_reason = "tool_use"
+
+    # Final call (without tools) - forced text response
+    final_text = Mock()
+    final_text.type = "text"
+    final_text.text = "Here is my answer based on the searches."
+
+    final_response = Mock()
+    final_response.content = [final_text]
+    final_response.stop_reason = "end_turn"
+
+    # Setup: 2 tool use responses, then final text
+    mock_client.messages.create.side_effect = [round1_response, round2_response, final_response]
 
     return mock_client
 

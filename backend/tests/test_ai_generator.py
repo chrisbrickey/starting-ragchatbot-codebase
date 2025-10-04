@@ -322,3 +322,232 @@ class TestAIGeneratorIntegrationWithToolManager:
 
         # Should still work if no tool use happens
         assert isinstance(response, str)
+
+
+class TestSequentialToolCalling:
+    """Test sequential tool calling functionality (up to 2 rounds)"""
+
+    def test_two_round_tool_calling(self, mock_anthropic_client_sequential_tool_use):
+        """Test that AI can make tool calls in two sequential rounds"""
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+        generator.client = mock_anthropic_client_sequential_tool_use
+
+        # Create mock tool manager
+        mock_tool_manager = Mock()
+        mock_tool_manager.execute_tool.side_effect = [
+            "Result from first search",
+            "Result from second search"
+        ]
+
+        tools = [{
+            "name": "search_course_content",
+            "description": "Search for course content",
+            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
+        }]
+
+        # Execute query
+        response = generator.generate_response(
+            query="Search for a course that discusses the same topic as lesson 4",
+            tools=tools,
+            tool_manager=mock_tool_manager
+        )
+
+        # Verify tool manager was called twice (two rounds)
+        assert mock_tool_manager.execute_tool.call_count == 2
+
+        # Verify final response is text
+        assert isinstance(response, str)
+        assert "Based on both searches" in response
+
+        # Verify API was called 3 times: round 1 (tool use), round 2 (tool use), final (text)
+        assert generator.client.messages.create.call_count == 3
+
+    def test_single_round_sufficient(self, mock_anthropic_client_with_tool_use):
+        """Test that loop exits early if AI gives text response after one tool call"""
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+        generator.client = mock_anthropic_client_with_tool_use
+
+        mock_tool_manager = Mock()
+        mock_tool_manager.execute_tool.return_value = "Search results"
+
+        tools = [{
+            "name": "search_course_content",
+            "description": "Search for course content",
+            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
+        }]
+
+        response = generator.generate_response(
+            query="Tell me about API calls",
+            tools=tools,
+            tool_manager=mock_tool_manager
+        )
+
+        # Should only call tool manager once
+        assert mock_tool_manager.execute_tool.call_count == 1
+
+        # Should make exactly 2 API calls (initial tool use, then text response)
+        assert generator.client.messages.create.call_count == 2
+
+        # Should return text response
+        assert isinstance(response, str)
+        assert len(response) > 0
+
+    def test_max_rounds_exhaustion(self, mock_anthropic_client_max_rounds_exhaustion):
+        """Test that hitting MAX_TOOL_ROUNDS triggers final call without tools"""
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+        generator.client = mock_anthropic_client_max_rounds_exhaustion
+
+        mock_tool_manager = Mock()
+        mock_tool_manager.execute_tool.side_effect = [
+            "First search result",
+            "Second search result"
+        ]
+
+        tools = [{
+            "name": "search_course_content",
+            "description": "Search for course content",
+            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
+        }]
+
+        response = generator.generate_response(
+            query="Complex query requiring multiple searches",
+            tools=tools,
+            tool_manager=mock_tool_manager
+        )
+
+        # Should execute tools twice (max rounds)
+        assert mock_tool_manager.execute_tool.call_count == 2
+
+        # Should make 3 API calls: round 1 (tool), round 2 (tool), final (forced text without tools)
+        assert generator.client.messages.create.call_count == 3
+
+        # Final call should NOT include tools parameter
+        final_call = generator.client.messages.create.call_args_list[2]
+        assert "tools" not in final_call.kwargs
+
+        # Should return text response
+        assert isinstance(response, str)
+        assert len(response) > 0
+
+    def test_message_context_preserved_across_rounds(self):
+        """Test that messages accumulate correctly across rounds"""
+        # Use a custom mock that captures messages at call time (not by reference)
+        mock_client = Mock()
+
+        captured_messages = []
+
+        def capture_call(**kwargs):
+            # Capture a copy of messages at call time
+            captured_messages.append(list(kwargs.get("messages", [])))
+            # Return appropriate response based on call count
+            call_count = len(captured_messages)
+            if call_count == 1:
+                # Round 1: tool use
+                tool = Mock(type="tool_use", id="tool1", name="search", input={})
+                return Mock(content=[tool], stop_reason="tool_use")
+            elif call_count == 2:
+                # Round 2: tool use
+                tool = Mock(type="tool_use", id="tool2", name="search", input={})
+                return Mock(content=[tool], stop_reason="tool_use")
+            else:
+                # Final: text
+                text = Mock(type="text", text="Final answer")
+                return Mock(content=[text], stop_reason="end_turn")
+
+        mock_client.messages.create.side_effect = capture_call
+
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+        generator.client = mock_client
+
+        mock_tool_manager = Mock()
+        mock_tool_manager.execute_tool.side_effect = ["First result", "Second result"]
+
+        tools = [{"name": "search", "description": "Search", "input_schema": {}}]
+        original_query = "What topics are covered in lesson 4?"
+
+        response = generator.generate_response(
+            query=original_query,
+            tools=tools,
+            tool_manager=mock_tool_manager
+        )
+
+        # Verify we made 3 calls total
+        assert len(captured_messages) == 3
+
+        # First call: should have initial user message only
+        assert len(captured_messages[0]) == 1
+        assert captured_messages[0][0]["role"] == "user"
+        assert captured_messages[0][0]["content"] == original_query
+
+        # Second call: should have accumulated messages including round 1
+        assert len(captured_messages[1]) == 3
+        assert captured_messages[1][0]["role"] == "user"  # original query
+        assert captured_messages[1][1]["role"] == "assistant"  # round 1 tool use
+        assert captured_messages[1][2]["role"] == "user"  # round 1 tool results
+
+        # Third call: should have all accumulated messages including both rounds
+        assert len(captured_messages[2]) == 5
+        assert captured_messages[2][0]["role"] == "user"  # original query
+        assert captured_messages[2][1]["role"] == "assistant"  # round 1 tool use
+        assert captured_messages[2][2]["role"] == "user"  # round 1 results
+        assert captured_messages[2][3]["role"] == "assistant"  # round 2 tool use
+        assert captured_messages[2][4]["role"] == "user"  # round 2 results
+
+        # Verify original query is preserved in all calls
+        for messages in captured_messages:
+            assert messages[0]["content"] == original_query
+
+    def test_conversation_history_preserved_in_system(self, mock_anthropic_client_sequential_tool_use):
+        """Test that conversation history is included in system prompt across all rounds"""
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+        generator.client = mock_anthropic_client_sequential_tool_use
+
+        mock_tool_manager = Mock()
+        mock_tool_manager.execute_tool.side_effect = ["Result 1", "Result 2"]
+
+        tools = [{"name": "search_course_content", "description": "Search", "input_schema": {}}]
+
+        history = "User: Hello\nAssistant: Hi there!"
+
+        response = generator.generate_response(
+            query="Tell me about lesson 4",
+            conversation_history=history,
+            tools=tools,
+            tool_manager=mock_tool_manager
+        )
+
+        # Check all API calls include history in system prompt
+        calls = generator.client.messages.create.call_args_list
+        for call in calls:
+            system_content = call.kwargs["system"]
+            assert history in system_content
+
+    def test_no_tool_manager_with_tool_use_request(self):
+        """Test graceful handling when tools requested but no manager provided"""
+        generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
+
+        # Mock client that wants to use tools
+        mock_tool = Mock()
+        mock_tool.type = "tool_use"
+        mock_tool.id = "test_id"
+        mock_tool.name = "search"
+        mock_tool.input = {}
+
+        mock_response = Mock()
+        mock_response.content = [mock_tool]
+        mock_response.stop_reason = "tool_use"
+
+        generator.client = Mock()
+        generator.client.messages.create.return_value = mock_response
+
+        tools = [{"name": "search", "description": "test", "input_schema": {}}]
+
+        response = generator.generate_response(
+            query="test",
+            tools=tools,
+            tool_manager=None  # No tool manager!
+        )
+
+        # Should return error message
+        assert isinstance(response, str)
+        assert "Unable to process tool requests" in response
