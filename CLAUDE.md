@@ -13,6 +13,23 @@ This is a Retrieval-Augmented Generation (RAG) system for course materials built
 - Manual start: `cd backend && uv run uvicorn app:app --reload --port 8000`
 - Environment setup: `uv sync` to install dependencies
 
+### Code Quality Tools
+- **Format code**: `./format.sh` - Automatically formats code with Black and organizes imports with isort
+- **Lint code**: `./lint.sh` - Checks code formatting and style without making changes
+- **Full quality check**: `./quality-check.sh` - Runs all checks including formatting, linting, type checking, and tests
+- **Run tests**: `uv run pytest backend/tests/` - Runs the test suite
+- **Type checking**: `uv run mypy backend/` - Checks types with mypy
+
+### Code Quality Standards
+This project enforces consistent code quality using:
+- **Black**: Code formatter (line length: 88 characters)
+- **isort**: Import statement organizer (Black-compatible profile)
+- **flake8**: Linting for code style and common errors
+- **mypy**: Static type checking for Python code
+- **pytest**: Testing framework
+
+All code should pass quality checks before committing. Run `./quality-check.sh` to verify.
+
 ### Environment Requirements
 - Python 3.13+ with uv package manager
 - Anthropic API key in `.env` file: `ANTHROPIC_API_KEY=your_key_here`
