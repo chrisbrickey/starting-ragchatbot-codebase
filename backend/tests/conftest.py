@@ -398,3 +398,181 @@ def empty_search_results():
 def error_search_results():
     """Create search results with error"""
     return SearchResults.empty("Search failed due to database error")
+
+
+# ==================== API Testing Fixtures ====================
+
+@pytest.fixture
+def test_app():
+    """Create a test FastAPI app without static file mounting issues.
+
+    This creates a standalone app with only API endpoints for testing,
+    avoiding the static file mounting that causes issues in test environments.
+    """
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional
+
+    # Create test app
+    app = FastAPI(title="Test RAG API")
+
+    # Add CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Pydantic models for request/response
+    class QueryRequest(BaseModel):
+        query: str
+        session_id: Optional[str] = None
+
+    class QueryResponse(BaseModel):
+        answer: str
+        sources: List[str]
+        session_id: str
+
+    class CourseStats(BaseModel):
+        total_courses: int
+        course_titles: List[str]
+
+    class SessionClearRequest(BaseModel):
+        session_id: str
+
+    class SessionClearResponse(BaseModel):
+        success: bool
+        message: str
+
+    # Store RAG system instance for injection in tests
+    app.state.rag_system = None
+
+    # API Endpoints
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        """Process a query and return response with sources"""
+        try:
+            rag_system = app.state.rag_system
+            if not rag_system:
+                raise HTTPException(status_code=500, detail="RAG system not initialized")
+
+            # Create session if not provided
+            session_id = request.session_id
+            if not session_id:
+                session_id = rag_system.session_manager.create_session()
+
+            # Process query using RAG system
+            answer, sources = rag_system.query(request.query, session_id)
+
+            return QueryResponse(
+                answer=answer,
+                sources=sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        """Get course analytics and statistics"""
+        try:
+            rag_system = app.state.rag_system
+            if not rag_system:
+                raise HTTPException(status_code=500, detail="RAG system not initialized")
+
+            analytics = rag_system.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/session/clear", response_model=SessionClearResponse)
+    async def clear_session(request: SessionClearRequest):
+        """Clear a conversation session"""
+        try:
+            rag_system = app.state.rag_system
+            if not rag_system:
+                raise HTTPException(status_code=500, detail="RAG system not initialized")
+
+            rag_system.session_manager.clear_session(request.session_id)
+            return SessionClearResponse(
+                success=True,
+                message=f"Session {request.session_id} cleared successfully"
+            )
+        except Exception as e:
+            return SessionClearResponse(
+                success=False,
+                message=f"Error clearing session: {str(e)}"
+            )
+
+    @app.get("/health")
+    async def health_check():
+        """Health check endpoint"""
+        return {"status": "healthy"}
+
+    return app
+
+
+@pytest.fixture
+async def test_client(test_app, rag_system_with_mock_store):
+    """Create a test client with injected RAG system"""
+    from httpx import ASGITransport, AsyncClient
+
+    # Inject RAG system into app state
+    test_app.state.rag_system = rag_system_with_mock_store
+
+    # Create async client
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def test_client_with_data(test_app, rag_system_populated_for_api):
+    """Create a test client with populated RAG system"""
+    from httpx import ASGITransport, AsyncClient
+
+    # Inject populated RAG system into app state
+    test_app.state.rag_system = rag_system_populated_for_api
+
+    # Create async client
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+def rag_system_populated_for_api(temp_chroma_dir, sample_course, sample_chunks):
+    """Create RAG system with populated vector store for API tests"""
+    from rag_system import RAGSystem
+    from config import Config
+    from unittest.mock import Mock
+
+    # Create test config
+    config = Config()
+    config.CHROMA_PATH = temp_chroma_dir
+    config.ANTHROPIC_API_KEY = "test_key_for_testing"
+    config.MAX_RESULTS = 3
+    config.MAX_HISTORY = 2
+
+    rag = RAGSystem(config)
+
+    # Populate with test data
+    rag.vector_store.add_course_metadata(sample_course)
+    rag.vector_store.add_course_content(sample_chunks)
+
+    # Mock AI to avoid API calls
+    mock_ai = Mock()
+    mock_ai.generate_response.return_value = "Based on the course content, here's the answer."
+    rag.ai_generator = mock_ai
+
+    yield rag
+
+    # Cleanup
+    del rag
+    gc.collect()
