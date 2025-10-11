@@ -3,7 +3,13 @@
     "allow": [
       "Bash(uv run pytest:*)",
       "Bash(uv sync:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(chmod:*)",
+      "Bash(./quality-check.sh:*)"
     ],
     "deny": [],
     "ask": []
