@@ -1,10 +1,12 @@
+from typing import Any, Dict, List, Optional
+
 import anthropic
-from typing import List, Optional, Dict, Any
 from config import config
+
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
-    
+
     # Static system prompt to avoid rebuilding on each call
     SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to a comprehensive search tool for course information.
 
@@ -29,22 +31,21 @@ All responses must be:
 4. **Example-supported** - Include relevant examples when they aid understanding
 Provide only the direct answer to what was asked.
 """
-    
+
     def __init__(self, api_key: str, model: str):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
-        
+
         # Pre-build base API parameters
-        self.base_params = {
-            "model": self.model,
-            "temperature": 0,
-            "max_tokens": 800
-        }
-    
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
+
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
         """
         Generate AI response with optional tool usage and conversation context.
         Supports up to MAX_TOOL_ROUNDS sequential tool calling rounds.
@@ -76,7 +77,7 @@ Provide only the direct answer to what was asked.
             api_params = {
                 **self.base_params,
                 "messages": messages,
-                "system": system_content
+                "system": system_content,
             }
 
             # Add tools if available
@@ -91,10 +92,14 @@ Provide only the direct answer to what was asked.
             if current_response.stop_reason == "tool_use":
                 if not tool_manager:
                     # No tool manager available - return error message
-                    return "Unable to process tool requests - tool manager not available"
+                    return (
+                        "Unable to process tool requests - tool manager not available"
+                    )
 
                 # Execute tools and add to message chain
-                messages.append({"role": "assistant", "content": current_response.content})
+                messages.append(
+                    {"role": "assistant", "content": current_response.content}
+                )
                 tool_results = self._execute_tools(current_response, tool_manager)
                 messages.append({"role": "user", "content": tool_results})
 
@@ -110,14 +115,18 @@ Provide only the direct answer to what was asked.
             final_params = {
                 **self.base_params,
                 "messages": messages,
-                "system": system_content
+                "system": system_content,
             }
             final_response = self.client.messages.create(**final_params)
             return final_response.content[0].text
 
         # Fallback: return text from last response
-        return current_response.content[0].text if current_response else "No response generated"
-    
+        return (
+            current_response.content[0].text
+            if current_response
+            else "No response generated"
+        )
+
     def _execute_tools(self, response, tool_manager) -> List[Dict[str, Any]]:
         """
         Execute all tool calls in a response and return results.
@@ -133,19 +142,22 @@ Provide only the direct answer to what was asked.
         for content_block in response.content:
             if content_block.type == "tool_use":
                 tool_result = tool_manager.execute_tool(
-                    content_block.name,
-                    **content_block.input
+                    content_block.name, **content_block.input
                 )
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": content_block.id,
-                    "content": tool_result
-                })
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": content_block.id,
+                        "content": tool_result,
+                    }
+                )
 
         return tool_results
 
-    def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
+    def _handle_tool_execution(
+        self, initial_response, base_params: Dict[str, Any], tool_manager
+    ):
         """
         DEPRECATED: Legacy method for backward compatibility.
         Handle execution of tool calls and get follow-up response.
@@ -175,7 +187,7 @@ Provide only the direct answer to what was asked.
         final_params = {
             **self.base_params,
             "messages": messages,
-            "system": base_params["system"]
+            "system": base_params["system"],
         }
 
         # Get final response

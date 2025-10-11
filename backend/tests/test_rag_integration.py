@@ -1,19 +1,21 @@
 """
 Integration tests for RAG system to identify query handling failures.
 """
-import pytest
-import sys
-import os
-import tempfile
-import shutil
+
 import gc
+import os
+import shutil
+import sys
+import tempfile
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
 
-from rag_system import RAGSystem
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from config import Config
-from models import Course, Lesson, CourseChunk
+from models import Course, CourseChunk, Lesson
+from rag_system import RAGSystem
 
 
 @pytest.fixture
@@ -67,7 +69,9 @@ def rag_system_populated(test_config, sample_course, sample_chunks):
 
     # Mock AI to avoid API calls
     mock_ai = Mock()
-    mock_ai.generate_response.return_value = "Based on the course content, here's the answer."
+    mock_ai.generate_response.return_value = (
+        "Based on the course content, here's the answer."
+    )
     rag.ai_generator = mock_ai
 
     yield rag
@@ -120,15 +124,16 @@ class TestRAGSystemQueryWithEmptyStore:
         session_id = rag_system_with_mock_ai.session_manager.create_session()
 
         response, sources = rag_system_with_mock_ai.query(
-            "Tell me about API calls",
-            session_id=session_id
+            "Tell me about API calls", session_id=session_id
         )
 
         assert isinstance(response, str)
         assert len(response) > 0
 
         # Session should have the exchange recorded
-        history = rag_system_with_mock_ai.session_manager.get_conversation_history(session_id)
+        history = rag_system_with_mock_ai.session_manager.get_conversation_history(
+            session_id
+        )
         assert history is not None
         assert "API calls" in history
 
@@ -204,7 +209,9 @@ class TestRAGSystemSessionManagement:
         response, _ = rag_system_populated.query(query_text, session_id)
 
         # Check history was updated
-        history = rag_system_populated.session_manager.get_conversation_history(session_id)
+        history = rag_system_populated.session_manager.get_conversation_history(
+            session_id
+        )
         assert history is not None
         assert query_text in history
 
@@ -245,13 +252,15 @@ class TestRAGSystemDocumentLoading:
 
         # Create test document
         test_file = tmp_path / "test_course.txt"
-        test_file.write_text("""Course Title: Test Course
+        test_file.write_text(
+            """Course Title: Test Course
 Course Link: https://example.com
 Course Instructor: Test Instructor
 
 Lesson 0: Introduction
 This is lesson content about APIs and tools.
-""")
+"""
+        )
 
         courses, chunks = rag.add_course_folder(str(tmp_path))
 
@@ -287,7 +296,9 @@ class TestRAGSystemErrorHandling:
     def test_query_with_ai_error(self, rag_system_populated):
         """Test handling when AI generation fails"""
         # Make AI generator raise an error
-        rag_system_populated.ai_generator.generate_response.side_effect = Exception("API Error")
+        rag_system_populated.ai_generator.generate_response.side_effect = Exception(
+            "API Error"
+        )
 
         with pytest.raises(Exception) as exc_info:
             rag_system_populated.query("Test query")
@@ -298,8 +309,7 @@ class TestRAGSystemErrorHandling:
         """Test querying with invalid session ID"""
         # Should handle gracefully - create new session or use no history
         response, sources = rag_system_populated.query(
-            "Test query",
-            session_id="invalid_session_id"
+            "Test query", session_id="invalid_session_id"
         )
 
         assert isinstance(response, str)
@@ -369,14 +379,12 @@ class TestRAGSystemRealScenarios:
 
         # Turn 1
         response1, _ = rag_system_populated.query(
-            "What is covered in lesson 1?",
-            session_id
+            "What is covered in lesson 1?", session_id
         )
 
         # Turn 2 - follow-up question
         response2, _ = rag_system_populated.query(
-            "Can you elaborate on that?",
-            session_id
+            "Can you elaborate on that?", session_id
         )
 
         # Both should complete
@@ -384,5 +392,7 @@ class TestRAGSystemRealScenarios:
         assert isinstance(response2, str)
 
         # History should contain both exchanges
-        history = rag_system_populated.session_manager.get_conversation_history(session_id)
+        history = rag_system_populated.session_manager.get_conversation_history(
+            session_id
+        )
         assert history is not None

@@ -1,22 +1,24 @@
 """
 Test fixtures and configuration for RAG system tests.
 """
-import pytest
-import tempfile
-import shutil
+
 import gc
-from unittest.mock import Mock
-from typing import Dict, Any, List
-import sys
 import os
+import shutil
+import sys
+import tempfile
+from typing import Any, Dict, List
+from unittest.mock import Mock
+
+import pytest
 
 # Add backend directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models import Course, Lesson, CourseChunk
-from vector_store import VectorStore, SearchResults
-from search_tools import CourseSearchTool, ToolManager
 from ai_generator import AIGenerator
+from models import Course, CourseChunk, Lesson
+from search_tools import CourseSearchTool, ToolManager
+from vector_store import SearchResults, VectorStore
 
 
 @pytest.fixture(scope="function")
@@ -50,14 +52,14 @@ def sample_course():
             Lesson(
                 lesson_number=0,
                 title="Introduction",
-                lesson_link="https://learn.deeplearning.ai/courses/building-toward-computer-use-with-anthropic/lesson/a6k0z/introduction"
+                lesson_link="https://learn.deeplearning.ai/courses/building-toward-computer-use-with-anthropic/lesson/a6k0z/introduction",
             ),
             Lesson(
                 lesson_number=1,
                 title="Getting Started with Claude API",
-                lesson_link="https://learn.deeplearning.ai/courses/building-toward-computer-use-with-anthropic/lesson/b7l1a/getting-started"
-            )
-        ]
+                lesson_link="https://learn.deeplearning.ai/courses/building-toward-computer-use-with-anthropic/lesson/b7l1a/getting-started",
+            ),
+        ],
     )
 
 
@@ -69,20 +71,20 @@ def sample_chunks(sample_course):
             content="Course Building Towards Computer Use with Anthropic Lesson 0 content: Welcome to Building Toward Computer Use with Anthropic. Built in partnership with Anthropic and taught by Colt Steele.",
             course_title=sample_course.title,
             lesson_number=0,
-            chunk_index=0
+            chunk_index=0,
         ),
         CourseChunk(
             content="This course covers tool calling, prompt caching, and computer use capabilities.",
             course_title=sample_course.title,
             lesson_number=0,
-            chunk_index=1
+            chunk_index=1,
         ),
         CourseChunk(
             content="Course Building Towards Computer Use with Anthropic Lesson 1 content: In this lesson, you'll learn how to make basic API calls to Claude.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=2
-        )
+            chunk_index=2,
+        ),
     ]
 
 
@@ -90,9 +92,7 @@ def sample_chunks(sample_course):
 def populated_vector_store(temp_chroma_dir, sample_course, sample_chunks):
     """Create a vector store with sample data"""
     store = VectorStore(
-        chroma_path=temp_chroma_dir,
-        embedding_model="all-MiniLM-L6-v2",
-        max_results=5
+        chroma_path=temp_chroma_dir, embedding_model="all-MiniLM-L6-v2", max_results=5
     )
 
     # Add course metadata and content
@@ -110,9 +110,7 @@ def populated_vector_store(temp_chroma_dir, sample_course, sample_chunks):
 def empty_vector_store(temp_chroma_dir):
     """Create an empty vector store"""
     store = VectorStore(
-        chroma_path=temp_chroma_dir,
-        embedding_model="all-MiniLM-L6-v2",
-        max_results=5
+        chroma_path=temp_chroma_dir, embedding_model="all-MiniLM-L6-v2", max_results=5
     )
 
     yield store
@@ -139,11 +137,11 @@ def mock_vector_store():
     mock.clear_all_data = Mock()
     mock.get_course_count = Mock(return_value=1)
     mock.get_existing_course_titles = Mock(return_value=["Test Course"])
-    mock.get_all_courses_metadata = Mock(return_value=[{
-        "title": "Test Course",
-        "instructor": "Test Instructor",
-        "lessons": []
-    }])
+    mock.get_all_courses_metadata = Mock(
+        return_value=[
+            {"title": "Test Course", "instructor": "Test Instructor", "lessons": []}
+        ]
+    )
     mock.get_lesson_link = Mock(return_value="https://example.com/lesson/1")
     mock.get_course_link = Mock(return_value="https://example.com/course")
 
@@ -151,11 +149,10 @@ def mock_vector_store():
     def mock_search_func(query, course_name=None, lesson_number=None, limit=None):
         return SearchResults(
             documents=["Sample content about " + query],
-            metadata=[{
-                "course_title": "Test Course",
-                "lesson_number": lesson_number or 1
-            }],
-            distances=[0.5]
+            metadata=[
+                {"course_title": "Test Course", "lesson_number": lesson_number or 1}
+            ],
+            distances=[0.5],
         )
 
     mock.search = Mock(side_effect=mock_search_func)
@@ -169,8 +166,8 @@ def rag_system_with_mock_store(mock_vector_store):
 
     Use this for tests that need RAG system but don't need real vector search.
     """
-    from rag_system import RAGSystem
     from config import Config
+    from rag_system import RAGSystem
 
     config = Config()
     config.ANTHROPIC_API_KEY = "test_key"
@@ -181,10 +178,10 @@ def rag_system_with_mock_store(mock_vector_store):
     rag.config = config
 
     # Initialize components WITHOUT calling __init__ (which creates VectorStore)
-    from document_processor import DocumentProcessor
-    from session_manager import SessionManager
     from ai_generator import AIGenerator
-    from search_tools import ToolManager, CourseSearchTool
+    from document_processor import DocumentProcessor
+    from search_tools import CourseSearchTool, ToolManager
+    from session_manager import SessionManager
 
     rag.document_processor = DocumentProcessor(config.CHUNK_SIZE, config.CHUNK_OVERLAP)
     rag.vector_store = mock_vector_store  # Use mock instead of real
@@ -307,7 +304,11 @@ def mock_anthropic_client_sequential_tool_use():
     final_response.stop_reason = "end_turn"
 
     # Setup the mock to return different responses on sequential calls
-    mock_client.messages.create.side_effect = [round1_response, round2_response, final_response]
+    mock_client.messages.create.side_effect = [
+        round1_response,
+        round2_response,
+        final_response,
+    ]
 
     return mock_client
 
@@ -349,7 +350,11 @@ def mock_anthropic_client_max_rounds_exhaustion():
     final_response.stop_reason = "end_turn"
 
     # Setup: 2 tool use responses, then final text
-    mock_client.messages.create.side_effect = [round1_response, round2_response, final_response]
+    mock_client.messages.create.side_effect = [
+        round1_response,
+        round2_response,
+        final_response,
+    ]
 
     return mock_client
 
@@ -368,30 +373,26 @@ def sample_search_results():
     return SearchResults(
         documents=[
             "This is content about API calls from lesson 1",
-            "More information about Claude API basics"
+            "More information about Claude API basics",
         ],
         metadata=[
             {
                 "course_title": "Building Towards Computer Use with Anthropic",
-                "lesson_number": 1
+                "lesson_number": 1,
             },
             {
                 "course_title": "Building Towards Computer Use with Anthropic",
-                "lesson_number": 1
-            }
+                "lesson_number": 1,
+            },
         ],
-        distances=[0.3, 0.5]
+        distances=[0.3, 0.5],
     )
 
 
 @pytest.fixture
 def empty_search_results():
     """Create empty search results"""
-    return SearchResults(
-        documents=[],
-        metadata=[],
-        distances=[]
-    )
+    return SearchResults(documents=[], metadata=[], distances=[])
 
 
 @pytest.fixture

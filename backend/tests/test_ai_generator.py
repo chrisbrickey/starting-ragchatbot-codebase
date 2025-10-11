@@ -1,12 +1,14 @@
 """
 Unit tests for AIGenerator to verify tool calling behavior.
 """
-import pytest
-import sys
-import os
-from unittest.mock import Mock, patch, MagicMock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import os
+import sys
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ai_generator import AIGenerator
 
@@ -25,7 +27,7 @@ class TestAIGeneratorInitialization:
 
     def test_system_prompt_defined(self):
         """Test that system prompt is defined"""
-        assert hasattr(AIGenerator, 'SYSTEM_PROMPT')
+        assert hasattr(AIGenerator, "SYSTEM_PROMPT")
         assert len(AIGenerator.SYSTEM_PROMPT) > 0
         assert "search tool" in AIGenerator.SYSTEM_PROMPT.lower()
 
@@ -49,8 +51,7 @@ class TestAIGeneratorBasicResponse:
         history = "User: Hello\nAssistant: Hi there!"
 
         response = ai_generator_with_mock_client.generate_response(
-            query="How are you?",
-            conversation_history=history
+            query="How are you?", conversation_history=history
         )
 
         assert isinstance(response, str)
@@ -60,9 +61,7 @@ class TestAIGeneratorBasicResponse:
 
     def test_generate_response_without_history(self, ai_generator_with_mock_client):
         """Test that system prompt doesn't include history when not provided"""
-        response = ai_generator_with_mock_client.generate_response(
-            query="Test query"
-        )
+        response = ai_generator_with_mock_client.generate_response(query="Test query")
 
         call_args = ai_generator_with_mock_client.client.messages.create.call_args
         system_content = call_args.kwargs["system"]
@@ -76,19 +75,20 @@ class TestAIGeneratorToolCalling:
 
     def test_generate_response_with_tools_no_use(self, ai_generator_with_mock_client):
         """Test that tools can be provided but not necessarily used"""
-        tools = [{
-            "name": "search_course_content",
-            "description": "Search for course content",
-            "input_schema": {
-                "type": "object",
-                "properties": {"query": {"type": "string"}},
-                "required": ["query"]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search for course content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
             }
-        }]
+        ]
 
         response = ai_generator_with_mock_client.generate_response(
-            query="General knowledge question",
-            tools=tools
+            query="General knowledge question", tools=tools
         )
 
         assert isinstance(response, str)
@@ -104,22 +104,24 @@ class TestAIGeneratorToolCalling:
 
         # Create a mock tool manager
         mock_tool_manager = Mock()
-        mock_tool_manager.execute_tool.return_value = "Search results: API documentation"
+        mock_tool_manager.execute_tool.return_value = (
+            "Search results: API documentation"
+        )
 
-        tools = [{
-            "name": "search_course_content",
-            "description": "Search for course content",
-            "input_schema": {
-                "type": "object",
-                "properties": {"query": {"type": "string"}},
-                "required": ["query"]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search for course content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
             }
-        }]
+        ]
 
         response = generator.generate_response(
-            query="Tell me about API calls",
-            tools=tools,
-            tool_manager=mock_tool_manager
+            query="Tell me about API calls", tools=tools, tool_manager=mock_tool_manager
         )
 
         # Should have executed the tool
@@ -136,13 +138,17 @@ class TestAIGeneratorToolCalling:
         mock_tool_manager = Mock()
         mock_tool_manager.execute_tool.return_value = "Tool result"
 
-        tools = [{"name": "search_course_content", "description": "Search", "input_schema": {}}]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search",
+                "input_schema": {},
+            }
+        ]
 
         # This should trigger tool execution
         response = generator.generate_response(
-            query="Search query",
-            tools=tools,
-            tool_manager=mock_tool_manager
+            query="Search query", tools=tools, tool_manager=mock_tool_manager
         )
 
         # The mock should have been called twice (initial + follow-up)
@@ -172,20 +178,17 @@ class TestHandleToolExecution:
         # Base params
         base_params = {
             "messages": [{"role": "user", "content": "test query"}],
-            "system": "system prompt"
+            "system": "system prompt",
         }
 
         # Execute
         result = ai_generator_with_mock_client._handle_tool_execution(
-            initial_response,
-            base_params,
-            mock_tool_manager
+            initial_response, base_params, mock_tool_manager
         )
 
         # Should call tool manager
         mock_tool_manager.execute_tool.assert_called_once_with(
-            "search_course_content",
-            query="test"
+            "search_course_content", query="test"
         )
 
         # Should make second API call
@@ -214,13 +217,11 @@ class TestHandleToolExecution:
 
         base_params = {
             "messages": [{"role": "user", "content": "test"}],
-            "system": "system"
+            "system": "system",
         }
 
         result = ai_generator_with_mock_client._handle_tool_execution(
-            initial_response,
-            base_params,
-            mock_tool_manager
+            initial_response, base_params, mock_tool_manager
         )
 
         # Should call tool manager twice
@@ -256,18 +257,18 @@ class TestAIGeneratorErrorHandling:
 
         # Tool manager that returns error
         mock_tool_manager = Mock()
-        mock_tool_manager.execute_tool.return_value = "Tool execution failed: Database error"
+        mock_tool_manager.execute_tool.return_value = (
+            "Tool execution failed: Database error"
+        )
 
         base_params = {
             "messages": [{"role": "user", "content": "test"}],
-            "system": "system"
+            "system": "system",
         }
 
         # Should still complete and return a response
         result = ai_generator_with_mock_client._handle_tool_execution(
-            initial_response,
-            base_params,
-            mock_tool_manager
+            initial_response, base_params, mock_tool_manager
         )
 
         # The error message should be passed to the model
@@ -277,7 +278,9 @@ class TestAIGeneratorErrorHandling:
 class TestAIGeneratorIntegrationWithToolManager:
     """Test integration between AIGenerator and ToolManager"""
 
-    def test_full_tool_calling_flow(self, mock_anthropic_client_with_tool_use, course_search_tool):
+    def test_full_tool_calling_flow(
+        self, mock_anthropic_client_with_tool_use, course_search_tool
+    ):
         """Test complete flow from query to tool use to response"""
         from search_tools import ToolManager
 
@@ -294,9 +297,7 @@ class TestAIGeneratorIntegrationWithToolManager:
 
         # Execute query
         response = generator.generate_response(
-            query="Tell me about API calls",
-            tools=tools,
-            tool_manager=tool_manager
+            query="Tell me about API calls", tools=tools, tool_manager=tool_manager
         )
 
         # Should complete successfully
@@ -310,14 +311,14 @@ class TestAIGeneratorIntegrationWithToolManager:
         mock_response.content = [Mock(text="Direct response", type="text")]
         mock_response.stop_reason = "end_turn"
 
-        ai_generator_with_mock_client.client.messages.create.return_value = mock_response
+        ai_generator_with_mock_client.client.messages.create.return_value = (
+            mock_response
+        )
 
         tools = [{"name": "search", "description": "test", "input_schema": {}}]
 
         response = ai_generator_with_mock_client.generate_response(
-            query="test",
-            tools=tools,
-            tool_manager=None  # No tool manager provided
+            query="test", tools=tools, tool_manager=None  # No tool manager provided
         )
 
         # Should still work if no tool use happens
@@ -336,20 +337,25 @@ class TestSequentialToolCalling:
         mock_tool_manager = Mock()
         mock_tool_manager.execute_tool.side_effect = [
             "Result from first search",
-            "Result from second search"
+            "Result from second search",
         ]
 
-        tools = [{
-            "name": "search_course_content",
-            "description": "Search for course content",
-            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
-        }]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search for course content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
+            }
+        ]
 
         # Execute query
         response = generator.generate_response(
             query="Search for a course that discusses the same topic as lesson 4",
             tools=tools,
-            tool_manager=mock_tool_manager
+            tool_manager=mock_tool_manager,
         )
 
         # Verify tool manager was called twice (two rounds)
@@ -370,16 +376,19 @@ class TestSequentialToolCalling:
         mock_tool_manager = Mock()
         mock_tool_manager.execute_tool.return_value = "Search results"
 
-        tools = [{
-            "name": "search_course_content",
-            "description": "Search for course content",
-            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
-        }]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search for course content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
+            }
+        ]
 
         response = generator.generate_response(
-            query="Tell me about API calls",
-            tools=tools,
-            tool_manager=mock_tool_manager
+            query="Tell me about API calls", tools=tools, tool_manager=mock_tool_manager
         )
 
         # Should only call tool manager once
@@ -400,19 +409,24 @@ class TestSequentialToolCalling:
         mock_tool_manager = Mock()
         mock_tool_manager.execute_tool.side_effect = [
             "First search result",
-            "Second search result"
+            "Second search result",
         ]
 
-        tools = [{
-            "name": "search_course_content",
-            "description": "Search for course content",
-            "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}
-        }]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search for course content",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
+            }
+        ]
 
         response = generator.generate_response(
             query="Complex query requiring multiple searches",
             tools=tools,
-            tool_manager=mock_tool_manager
+            tool_manager=mock_tool_manager,
         )
 
         # Should execute tools twice (max rounds)
@@ -466,9 +480,7 @@ class TestSequentialToolCalling:
         original_query = "What topics are covered in lesson 4?"
 
         response = generator.generate_response(
-            query=original_query,
-            tools=tools,
-            tool_manager=mock_tool_manager
+            query=original_query, tools=tools, tool_manager=mock_tool_manager
         )
 
         # Verify we made 3 calls total
@@ -497,7 +509,9 @@ class TestSequentialToolCalling:
         for messages in captured_messages:
             assert messages[0]["content"] == original_query
 
-    def test_conversation_history_preserved_in_system(self, mock_anthropic_client_sequential_tool_use):
+    def test_conversation_history_preserved_in_system(
+        self, mock_anthropic_client_sequential_tool_use
+    ):
         """Test that conversation history is included in system prompt across all rounds"""
         generator = AIGenerator(api_key="test_key", model="claude-sonnet-4-20250514")
         generator.client = mock_anthropic_client_sequential_tool_use
@@ -505,7 +519,13 @@ class TestSequentialToolCalling:
         mock_tool_manager = Mock()
         mock_tool_manager.execute_tool.side_effect = ["Result 1", "Result 2"]
 
-        tools = [{"name": "search_course_content", "description": "Search", "input_schema": {}}]
+        tools = [
+            {
+                "name": "search_course_content",
+                "description": "Search",
+                "input_schema": {},
+            }
+        ]
 
         history = "User: Hello\nAssistant: Hi there!"
 
@@ -513,7 +533,7 @@ class TestSequentialToolCalling:
             query="Tell me about lesson 4",
             conversation_history=history,
             tools=tools,
-            tool_manager=mock_tool_manager
+            tool_manager=mock_tool_manager,
         )
 
         # Check all API calls include history in system prompt
@@ -543,9 +563,7 @@ class TestSequentialToolCalling:
         tools = [{"name": "search", "description": "test", "input_schema": {}}]
 
         response = generator.generate_response(
-            query="test",
-            tools=tools,
-            tool_manager=None  # No tool manager!
+            query="test", tools=tools, tool_manager=None  # No tool manager!
         )
 
         # Should return error message
