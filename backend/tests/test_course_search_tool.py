@@ -1,11 +1,13 @@
 """
 Unit tests for CourseSearchTool to identify search execution issues.
 """
-import pytest
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import os
+import sys
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from search_tools import CourseSearchTool, ToolManager
 from vector_store import SearchResults
@@ -62,8 +64,7 @@ class TestCourseSearchToolExecuteBasic:
     def test_execute_with_course_name_filter(self, course_search_tool):
         """Test executing with course name filter"""
         result = course_search_tool.execute(
-            query="API calls",
-            course_name="Building Towards Computer Use"
+            query="API calls", course_name="Building Towards Computer Use"
         )
 
         assert isinstance(result, str)
@@ -71,10 +72,7 @@ class TestCourseSearchToolExecuteBasic:
 
     def test_execute_with_lesson_number_filter(self, course_search_tool):
         """Test executing with lesson number filter"""
-        result = course_search_tool.execute(
-            query="introduction",
-            lesson_number=0
-        )
+        result = course_search_tool.execute(query="introduction", lesson_number=0)
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -82,9 +80,7 @@ class TestCourseSearchToolExecuteBasic:
     def test_execute_with_both_filters(self, course_search_tool):
         """Test executing with both course name and lesson number"""
         result = course_search_tool.execute(
-            query="API",
-            course_name="Building Towards Computer Use",
-            lesson_number=1
+            query="API", course_name="Building Towards Computer Use", lesson_number=1
         )
 
         assert isinstance(result, str)
@@ -111,8 +107,7 @@ class TestCourseSearchToolEmptyResults:
         provides useful results despite imperfect filters.
         """
         result = course_search_tool.execute(
-            query="API calls",
-            course_name="Nonexistent Course Title"
+            query="API calls", course_name="Nonexistent Course Title"
         )
 
         # Vector search may return relevant content despite non-matching course name
@@ -122,10 +117,7 @@ class TestCourseSearchToolEmptyResults:
 
     def test_execute_with_nonexistent_lesson(self, course_search_tool):
         """Test executing with lesson number that doesn't exist"""
-        result = course_search_tool.execute(
-            query="API calls",
-            lesson_number=999
-        )
+        result = course_search_tool.execute(query="API calls", lesson_number=999)
 
         # Should return no results message
         assert isinstance(result, str)
@@ -153,10 +145,7 @@ class TestCourseSearchToolFormatting:
 
     def test_format_results_with_lesson_info(self, course_search_tool):
         """Test that results include lesson information"""
-        result = course_search_tool.execute(
-            query="API calls",
-            lesson_number=1
-        )
+        result = course_search_tool.execute(query="API calls", lesson_number=1)
 
         # Should contain lesson number in the output
         assert "Lesson" in result or "lesson" in result.lower()
@@ -167,7 +156,7 @@ class TestCourseSearchToolSourceTracking:
 
     def test_last_sources_initialized(self, course_search_tool):
         """Test that last_sources is initialized"""
-        assert hasattr(course_search_tool, 'last_sources')
+        assert hasattr(course_search_tool, "last_sources")
         assert isinstance(course_search_tool.last_sources, list)
 
     def test_last_sources_populated_after_search(self, course_search_tool):
@@ -198,7 +187,9 @@ class TestCourseSearchToolSourceTracking:
 
         if course_search_tool.last_sources:
             # At least one source should have a link
-            has_link = any(source.get("link") for source in course_search_tool.last_sources)
+            has_link = any(
+                source.get("link") for source in course_search_tool.last_sources
+            )
             # Note: This might be None if lesson links aren't set, so we just check structure
             assert all("link" in source for source in course_search_tool.last_sources)
 
@@ -223,20 +214,14 @@ class TestToolManager:
 
     def test_tool_manager_execute_tool(self, tool_manager):
         """Test executing a tool through the manager"""
-        result = tool_manager.execute_tool(
-            "search_course_content",
-            query="API calls"
-        )
+        result = tool_manager.execute_tool("search_course_content", query="API calls")
 
         assert isinstance(result, str)
         assert len(result) > 0
 
     def test_tool_manager_execute_nonexistent_tool(self, tool_manager):
         """Test executing a tool that doesn't exist"""
-        result = tool_manager.execute_tool(
-            "nonexistent_tool",
-            query="test"
-        )
+        result = tool_manager.execute_tool("nonexistent_tool", query="test")
 
         assert "not found" in result.lower()
 
