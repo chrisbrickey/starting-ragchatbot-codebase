@@ -7,11 +7,13 @@ These tests cover all API endpoints including:
 - /api/session/clear - Session management endpoint
 - /health - Health check endpoint
 """
-import pytest
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import os
+import sys
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Mark all tests in this file as API tests
 pytestmark = pytest.mark.api
@@ -37,8 +39,7 @@ class TestQueryEndpoint:
     async def test_query_basic(self, test_client):
         """Test basic query without session ID"""
         response = await test_client.post(
-            "/api/query",
-            json={"query": "What is an API?"}
+            "/api/query", json={"query": "What is an API?"}
         )
 
         assert response.status_code == 200
@@ -63,11 +64,7 @@ class TestQueryEndpoint:
         session_id = "test-session-123"
 
         response = await test_client.post(
-            "/api/query",
-            json={
-                "query": "Tell me about APIs",
-                "session_id": session_id
-            }
+            "/api/query", json={"query": "Tell me about APIs", "session_id": session_id}
         )
 
         assert response.status_code == 200
@@ -79,10 +76,7 @@ class TestQueryEndpoint:
     @pytest.mark.asyncio
     async def test_query_missing_query_field(self, test_client):
         """Test query endpoint with missing query field"""
-        response = await test_client.post(
-            "/api/query",
-            json={}
-        )
+        response = await test_client.post("/api/query", json={})
 
         # Should return validation error (422)
         assert response.status_code == 422
@@ -90,10 +84,7 @@ class TestQueryEndpoint:
     @pytest.mark.asyncio
     async def test_query_empty_query_string(self, test_client):
         """Test query with empty string"""
-        response = await test_client.post(
-            "/api/query",
-            json={"query": ""}
-        )
+        response = await test_client.post("/api/query", json={"query": ""})
 
         # Should still process (200) even with empty query
         # The RAG system should handle this gracefully
@@ -103,8 +94,7 @@ class TestQueryEndpoint:
     async def test_query_with_populated_data(self, test_client_with_data):
         """Test query against populated vector store"""
         response = await test_client_with_data.post(
-            "/api/query",
-            json={"query": "What topics are covered in lesson 1?"}
+            "/api/query", json={"query": "What topics are covered in lesson 1?"}
         )
 
         assert response.status_code == 200
@@ -118,8 +108,7 @@ class TestQueryEndpoint:
         """Test multi-turn conversation with session"""
         # First query
         response1 = await test_client_with_data.post(
-            "/api/query",
-            json={"query": "What is covered in lesson 0?"}
+            "/api/query", json={"query": "What is covered in lesson 0?"}
         )
 
         assert response1.status_code == 200
@@ -129,10 +118,7 @@ class TestQueryEndpoint:
         # Second query using same session
         response2 = await test_client_with_data.post(
             "/api/query",
-            json={
-                "query": "Tell me more about that",
-                "session_id": session_id
-            }
+            json={"query": "Tell me more about that", "session_id": session_id},
         )
 
         assert response2.status_code == 200
@@ -147,7 +133,7 @@ class TestQueryEndpoint:
         response = await test_client.post(
             "/api/query",
             content="not valid json",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         # Should return 422 for invalid JSON
@@ -158,10 +144,7 @@ class TestQueryEndpoint:
         """Test query with very long query text"""
         long_query = "Tell me about APIs " * 100  # Very long query
 
-        response = await test_client.post(
-            "/api/query",
-            json={"query": long_query}
-        )
+        response = await test_client.post("/api/query", json={"query": long_query})
 
         # Should handle long queries
         assert response.status_code == 200
@@ -170,8 +153,7 @@ class TestQueryEndpoint:
     async def test_query_special_characters(self, test_client):
         """Test query with special characters"""
         response = await test_client.post(
-            "/api/query",
-            json={"query": "What about <script>alert('test')</script>?"}
+            "/api/query", json={"query": "What about <script>alert('test')</script>?"}
         )
 
         assert response.status_code == 200
@@ -240,15 +222,13 @@ class TestSessionClearEndpoint:
         """Test successfully clearing a session"""
         # First create a query to establish a session
         query_response = await test_client.post(
-            "/api/query",
-            json={"query": "Test query"}
+            "/api/query", json={"query": "Test query"}
         )
         session_id = query_response.json()["session_id"]
 
         # Now clear the session
         response = await test_client.post(
-            "/api/session/clear",
-            json={"session_id": session_id}
+            "/api/session/clear", json={"session_id": session_id}
         )
 
         assert response.status_code == 200
@@ -262,8 +242,7 @@ class TestSessionClearEndpoint:
     async def test_clear_nonexistent_session(self, test_client):
         """Test clearing a session that doesn't exist"""
         response = await test_client.post(
-            "/api/session/clear",
-            json={"session_id": "nonexistent-session-id"}
+            "/api/session/clear", json={"session_id": "nonexistent-session-id"}
         )
 
         # Should handle gracefully (might succeed or fail depending on implementation)
@@ -275,10 +254,7 @@ class TestSessionClearEndpoint:
     @pytest.mark.asyncio
     async def test_clear_session_missing_session_id(self, test_client):
         """Test clearing session without session_id"""
-        response = await test_client.post(
-            "/api/session/clear",
-            json={}
-        )
+        response = await test_client.post("/api/session/clear", json={})
 
         # Should return validation error
         assert response.status_code == 422
@@ -286,10 +262,7 @@ class TestSessionClearEndpoint:
     @pytest.mark.asyncio
     async def test_clear_session_empty_session_id(self, test_client):
         """Test clearing session with empty session_id"""
-        response = await test_client.post(
-            "/api/session/clear",
-            json={"session_id": ""}
-        )
+        response = await test_client.post("/api/session/clear", json={"session_id": ""})
 
         # Should process (might fail or succeed)
         assert response.status_code in [200, 500]
@@ -313,8 +286,8 @@ class TestCORSHeaders:
             "/api/query",
             headers={
                 "Origin": "http://localhost:3000",
-                "Access-Control-Request-Method": "POST"
-            }
+                "Access-Control-Request-Method": "POST",
+            },
         )
 
         # Check for CORS headers in preflight response
@@ -328,8 +301,8 @@ class TestCORSHeaders:
             "/api/query",
             headers={
                 "Origin": "http://localhost:3000",
-                "Access-Control-Request-Method": "POST"
-            }
+                "Access-Control-Request-Method": "POST",
+            },
         )
 
         # Should allow CORS
@@ -340,12 +313,16 @@ class TestErrorHandling:
     """Test error handling across API endpoints"""
 
     @pytest.mark.asyncio
-    async def test_query_with_ai_generator_error(self, test_app, rag_system_with_mock_store):
+    async def test_query_with_ai_generator_error(
+        self, test_app, rag_system_with_mock_store
+    ):
         """Test query handling when AI generator fails"""
         from httpx import ASGITransport, AsyncClient
 
         # Make AI generator raise an error
-        rag_system_with_mock_store.ai_generator.generate_response.side_effect = Exception("API Error")
+        rag_system_with_mock_store.ai_generator.generate_response.side_effect = (
+            Exception("API Error")
+        )
 
         # Inject RAG system into app
         test_app.state.rag_system = rag_system_with_mock_store
@@ -353,10 +330,7 @@ class TestErrorHandling:
         # Create client
         transport = ASGITransport(app=test_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.post(
-                "/api/query",
-                json={"query": "Test query"}
-            )
+            response = await client.post("/api/query", json={"query": "Test query"})
 
             # Should return 500 error
             assert response.status_code == 500
@@ -389,10 +363,7 @@ class TestRequestValidation:
         """Test that extra fields in request are ignored"""
         response = await test_client.post(
             "/api/query",
-            json={
-                "query": "Test query",
-                "extra_field": "should be ignored"
-            }
+            json={"query": "Test query", "extra_field": "should be ignored"},
         )
 
         # Should still work
@@ -402,10 +373,7 @@ class TestRequestValidation:
     async def test_query_wrong_field_type(self, test_client):
         """Test query with wrong field type"""
         response = await test_client.post(
-            "/api/query",
-            json={
-                "query": 123  # Should be string
-            }
+            "/api/query", json={"query": 123}  # Should be string
         )
 
         # Should return validation error
@@ -415,10 +383,7 @@ class TestRequestValidation:
     async def test_session_clear_wrong_field_type(self, test_client):
         """Test session clear with wrong field type"""
         response = await test_client.post(
-            "/api/session/clear",
-            json={
-                "session_id": 123  # Should be string
-            }
+            "/api/session/clear", json={"session_id": 123}  # Should be string
         )
 
         # Should return validation error
@@ -431,10 +396,7 @@ class TestResponseStructure:
     @pytest.mark.asyncio
     async def test_query_response_structure(self, test_client):
         """Test query response has all required fields"""
-        response = await test_client.post(
-            "/api/query",
-            json={"query": "Test"}
-        )
+        response = await test_client.post("/api/query", json={"query": "Test"})
 
         data = response.json()
 
@@ -455,8 +417,7 @@ class TestResponseStructure:
     async def test_session_clear_response_structure(self, test_client):
         """Test session clear response has all required fields"""
         response = await test_client.post(
-            "/api/session/clear",
-            json={"session_id": "test-session"}
+            "/api/session/clear", json={"session_id": "test-session"}
         )
 
         data = response.json()
@@ -515,27 +476,20 @@ class TestSessionPersistence:
         """Test that session state persists across multiple queries"""
         # First query
         response1 = await test_client_with_data.post(
-            "/api/query",
-            json={"query": "What is in lesson 1?"}
+            "/api/query", json={"query": "What is in lesson 1?"}
         )
         session_id = response1.json()["session_id"]
 
         # Second query with same session
         response2 = await test_client_with_data.post(
             "/api/query",
-            json={
-                "query": "Can you tell me more?",
-                "session_id": session_id
-            }
+            json={"query": "Can you tell me more?", "session_id": session_id},
         )
 
         # Third query with same session
         response3 = await test_client_with_data.post(
             "/api/query",
-            json={
-                "query": "What about the examples?",
-                "session_id": session_id
-            }
+            json={"query": "What about the examples?", "session_id": session_id},
         )
 
         # All should use the same session
@@ -547,14 +501,12 @@ class TestSessionPersistence:
         """Test that different sessions are isolated from each other"""
         # Create two different sessions
         response1 = await test_client_with_data.post(
-            "/api/query",
-            json={"query": "First session query"}
+            "/api/query", json={"query": "First session query"}
         )
         session1 = response1.json()["session_id"]
 
         response2 = await test_client_with_data.post(
-            "/api/query",
-            json={"query": "Second session query"}
+            "/api/query", json={"query": "Second session query"}
         )
         session2 = response2.json()["session_id"]
 
