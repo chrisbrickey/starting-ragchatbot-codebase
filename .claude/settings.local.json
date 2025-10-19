@@ -13,5 +13,22 @@
     ],
     "deny": [],
     "ask": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "say 'search complete'"
+          },
+          {
+            "type": "command",
+            "command": "say 'search complete'"
+          }
+        ]
+      }
+    ]
   }
 }
